@@ -55,7 +55,7 @@ public final class TerasologyApplet extends Applet {
     }
 
     private void obtainMods() {
-        String[] mods = getParameter("mods").split(",");
+        String[] mods = getParameter("modules").split(",");
         String modsPath = getParameter("mods_path") + "mods/";
         for (String mod : mods) {
             try {
