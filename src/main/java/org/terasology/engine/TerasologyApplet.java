@@ -15,10 +15,16 @@
  */
 package org.terasology.engine;
 
+import com.google.common.collect.Lists;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.terasology.engine.modes.StateMainMenu;
 import org.terasology.engine.paths.PathManager;
+import org.terasology.engine.subsystem.EngineSubsystem;
+import org.terasology.engine.subsystem.lwjgl.LwjglAudio;
+import org.terasology.engine.subsystem.lwjgl.LwjglGraphics;
+import org.terasology.engine.subsystem.lwjgl.LwjglInput;
+import org.terasology.engine.subsystem.lwjgl.LwjglTimer;
 
 import java.applet.Applet;
 import java.io.IOException;
@@ -30,6 +36,7 @@ import java.nio.channels.ReadableByteChannel;
 import java.nio.channels.SeekableByteChannel;
 import java.nio.file.Files;
 import java.nio.file.StandardOpenOption;
+import java.util.Collection;
 
 /**
  * @author Benjamin Glatzel <benjamin.glatzel@me.com>
@@ -89,7 +96,10 @@ public final class TerasologyApplet extends Applet {
             @Override
             public void run() {
                 try {
-                    engine = new TerasologyEngine();
+                    Collection<EngineSubsystem> subsystemList;
+                    subsystemList = Lists.<EngineSubsystem>newArrayList(new LwjglGraphics(), new LwjglTimer(), new LwjglAudio(), new LwjglInput());
+                    TerasologyEngine engine = new TerasologyEngine(subsystemList);
+                    engine.init();
                     engine.run(new StateMainMenu());
                     engine.dispose();
                 } catch (Exception e) {
