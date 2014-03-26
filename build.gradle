@@ -5,13 +5,13 @@ apply from: "$rootDir/config/gradle/common.gradle"
 
 import org.apache.tools.ant.filters.FixCrLfFilter;
 
-def LWJGL_VERSION = '2.9.0'
+def LWJGL_VERSION = '2.9.1'
 def JINPUT_VERSION = '2.0.5'
 
 // Declare "extra properties" (variables) for the project - a Gradle thing that makes them special.
 ext {
     // Project paths
-    dirApplet = 'applet'
+    dirApplet = 'facades/applet'
     subDirLibs = 'libs'
     subDirModules = 'mods'
     destDirApplet = 'distributions/applet'
@@ -36,16 +36,25 @@ dependencies {
     applet group: 'org.lwjgl.lwjgl', name: 'lwjgl_util_applet', version: LWJGL_VERSION
 }
 
+jar {
+   manifest.mainAttributes("Permissions": "all-permissions")
+   manifest.mainAttributes("Codebase": "*")
+   manifest.mainAttributes("Application-Name": "Terasology Applet")
+   manifest.mainAttributes("Application-Library-Allowable-Codebase": "*")
+   manifest.mainAttributes("Caller-Allowable-Codebase": "*")
+   manifest.mainAttributes("Trusted-Only": "true")
+}
+
 task syncIntoApplet(type:Sync) {
     into("$buildDir/$destDirApplet")
-    from ('README.markdown') {
+    from ("$rootDir/README.markdown") {
         filter(FixCrLfFilter, eol:FixCrLfFilter.CrLf.newInstance("crlf"))
         rename('README.markdown', 'README')
     }
-    from ('LICENSE') {
+    from ("$rootDir/LICENSE") {
         filter(FixCrLfFilter, eol:FixCrLfFilter.CrLf.newInstance("crlf"))
     }
-    from ('NOTICE') {
+    from ("$rootDir/NOTICE") {
         filter(FixCrLfFilter, eol:FixCrLfFilter.CrLf.newInstance("crlf"))
     }
     from jar
@@ -86,17 +95,21 @@ task distApplet {
 
 // At the end of the applet distribution sign the jar files so they can get expanded rights in a browser
 distApplet.doLast {
+	if (!(new File("$dirApplet/certum.jks").exists())) {
+		throw new GradleException("Before you can run this task, place the certum.jks keystore file in \"$dirApplet\". See the README file on how to create the keystore.");
+	}
+
     file("$buildDir/$destDirApplet").listFiles().each {
         if (it.getName().endsWith(".jar"))
-            ant.signjar(jar: it, keystore: "$dirApplet/tera.keystore", alias: 'Terasology', storepass: 'Terasology')
+            ant.signjar(jar: it, keystore: "certum.jks", alias: 'cervator', storepass: 'Terasology', tsaurl: 'http://time.certum.pl/')
     }
     file("$buildDir/$destDirApplet/$subDirLibs").listFiles().each {
         if (it.getName().endsWith(".jar"))
-            ant.signjar(jar: it, keystore: "$dirApplet/tera.keystore", alias: 'Terasology', storepass: 'Terasology')
+            ant.signjar(jar: it, keystore: "certum.jks", alias: 'cervator', storepass: 'Terasology', tsaurl: 'http://time.certum.pl/')
     }
-    file("$buildDir/$destDirApplet/$subDirMods").listFiles().each {
+    file("$buildDir/$destDirApplet/$subDirModules").listFiles().each {
         if (it.getName().endsWith(".jar"))
-            ant.signjar(jar: it, keystore: "$dirApplet/tera.keystore", alias: 'Terasology', storepass: 'Terasology')
+            ant.signjar(jar: it, keystore: "certum.jks", alias: 'cervator', storepass: 'Terasology', tsaurl: 'http://time.certum.pl/')
     }
 }
 
