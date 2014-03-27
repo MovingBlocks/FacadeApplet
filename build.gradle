@@ -4,6 +4,7 @@
 apply from: "$rootDir/config/gradle/common.gradle"
 
 import org.apache.tools.ant.filters.FixCrLfFilter;
+import org.apache.tools.ant.taskdefs.condition.IsSigned;
 
 def LWJGL_VERSION = '2.9.1'
 def JINPUT_VERSION = '2.0.5'
@@ -11,7 +12,6 @@ def JINPUT_VERSION = '2.0.5'
 // Declare "extra properties" (variables) for the project - a Gradle thing that makes them special.
 ext {
     // Project paths
-    dirApplet = 'facades/applet'
     subDirLibs = 'libs'
     subDirModules = 'mods'
     destDirApplet = 'distributions/applet'
@@ -80,7 +80,7 @@ task createIndexHtml(type:Copy) {
             modules += project.name + '.jar'
         }
     }
-    from(dirApplet)
+    from('.')
     into("$buildDir/$destDirApplet")
     include 'index.html'
     expand(lwjglVersion: LWJGL_VERSION, jinputVersion : JINPUT_VERSION, jars : jars.join(", "), modules : modules.join(", "))
@@ -95,22 +95,26 @@ task distApplet {
 
 // At the end of the applet distribution sign the jar files so they can get expanded rights in a browser
 distApplet.doLast {
-	if (!(new File("$dirApplet/certum.jks").exists())) {
-		throw new GradleException("Before you can run this task, place the certum.jks keystore file in \"$dirApplet\". See the README file on how to create the keystore.");
+
+	if (!file('certum.jks').exists()) {
+		throw new GradleException("Copy the \"certum.jks\" keystore file in \"$projectDir\" first. See the README file on how to create the keystore.");
 	}
 
-    file("$buildDir/$destDirApplet").listFiles().each {
-        if (it.getName().endsWith(".jar"))
-            ant.signjar(jar: it, keystore: "certum.jks", alias: 'cervator', storepass: 'Terasology', tsaurl: 'http://time.certum.pl/')
-    }
-    file("$buildDir/$destDirApplet/$subDirLibs").listFiles().each {
-        if (it.getName().endsWith(".jar"))
-            ant.signjar(jar: it, keystore: "certum.jks", alias: 'cervator', storepass: 'Terasology', tsaurl: 'http://time.certum.pl/')
-    }
-    file("$buildDir/$destDirApplet/$subDirModules").listFiles().each {
-        if (it.getName().endsWith(".jar"))
-            ant.signjar(jar: it, keystore: "certum.jks", alias: 'cervator', storepass: 'Terasology', tsaurl: 'http://time.certum.pl/')
-    }
+	FileTree tree = fileTree(dir: "$buildDir/$destDirApplet")
+	
+	tree.include '*.jar'
+	tree.include "$subDirLibs/*.jar"
+	tree.include "$subDirModules/*.jar"
+	
+    tree.each {
+		String signAlias = null;	// LWJGL
+		if (!IsSigned.isSigned(it, signAlias)) {
+			logger.lifecycle("Signing $it");
+			ant.signjar(jar: it, keystore: "certum.jks", alias: 'cervator', storepass: 'Terasology', tsaurl: 'http://time.certum.pl/')
+		} else {
+			logger.lifecycle("File $it already signed");
+		}
+	}
 }
 
 task distAppletZip(type:Zip) {
