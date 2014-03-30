@@ -15,9 +15,7 @@
  */
 package org.terasology.engine;
 
-import java.applet.Applet;
-import java.io.IOException;
-import java.util.Collection;
+import com.google.common.collect.Lists;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -29,7 +27,18 @@ import org.terasology.engine.subsystem.lwjgl.LwjglGraphics;
 import org.terasology.engine.subsystem.lwjgl.LwjglInput;
 import org.terasology.engine.subsystem.lwjgl.LwjglTimer;
 
-import com.google.common.collect.Lists;
+import java.applet.Applet;
+import java.io.IOException;
+import java.net.MalformedURLException;
+import java.net.URL;
+import java.nio.ByteBuffer;
+import java.nio.channels.Channels;
+import java.nio.channels.ReadableByteChannel;
+import java.nio.channels.SeekableByteChannel;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
+import java.util.Collection;
 
 /**
  * @author Benjamin Glatzel <benjamin.glatzel@me.com>
@@ -50,7 +59,41 @@ public final class TerasologyApplet extends Applet {
             throw new RuntimeException("Failed to start applet - could not obtain home path.", e);
         }
         logger = LoggerFactory.getLogger(TerasologyApplet.class);
+        obtainMods();
+        startGame();
+    }
 
+    private void obtainMods() {
+        String[] mods = getParameter("modules").split(",");
+        String modsPath = getParameter("mods_path") + "mods/";
+        for (String mod : mods) {
+            try {
+                URL url = new URL(modsPath + mod);
+                try (ReadableByteChannel rbc = Channels.newChannel(url.openStream());
+                     SeekableByteChannel writeChannel = Files.newByteChannel(PathManager.getInstance().getHomeModPath().resolve(mod),
+                             StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.WRITE)) {
+                    ByteBuffer buffer = ByteBuffer.allocateDirect(1 << 24);
+                    while (rbc.read(buffer) != -1) {
+                        buffer.flip();
+                        writeChannel.write(buffer);
+                        buffer.compact();
+                    }
+                    buffer.flip();
+                    while (buffer.hasRemaining()) {
+                        writeChannel.write(buffer);
+                    }
+                } catch (IOException e) {
+                    logger.error("Unable to obtain module '{}'", mod, e);
+                }
+            } catch (MalformedURLException e) {
+                logger.error("Unable to obtain module '{}'", mod, e);
+            }
+
+
+        }
+    }
+
+    private void startGame() {
         gameThread = new Thread() {
             @Override
             public void run() {
