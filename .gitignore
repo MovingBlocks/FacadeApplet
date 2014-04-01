@@ -6,3 +6,6 @@ build/
 *.launch
 *.iml
 /bin
+
+# Do not EVER put this file into the repository
+certum.jks

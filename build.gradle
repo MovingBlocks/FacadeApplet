@@ -4,14 +4,14 @@
 apply from: "$rootDir/config/gradle/common.gradle"
 
 import org.apache.tools.ant.filters.FixCrLfFilter;
+import org.apache.tools.ant.taskdefs.condition.IsSigned;
 
-def LWJGL_VERSION = '2.9.0'
+def LWJGL_VERSION = '2.9.1'
 def JINPUT_VERSION = '2.0.5'
 
 // Declare "extra properties" (variables) for the project - a Gradle thing that makes them special.
 ext {
     // Project paths
-    dirApplet = 'applet'
     subDirLibs = 'libs'
     subDirModules = 'mods'
     destDirApplet = 'distributions/applet'
@@ -33,19 +33,30 @@ configurations {
 
 dependencies {
     compile project(':engine')
-    applet group: 'org.lwjgl.lwjgl', name: 'lwjgl_util_applet', version: LWJGL_VERSION
+    applet (group: 'org.lwjgl.lwjgl', name: 'lwjgl_util_applet', version: LWJGL_VERSION)
+    applet (group: 'org.nanoware.engine', name: 'engine', version: '+')
+    applet (group: 'org.nanoware.modules', name: 'Core', version: '+')
+}
+
+jar {
+   manifest.mainAttributes('Permissions': 'all-permissions')
+   manifest.mainAttributes('Codebase': '*')
+   manifest.mainAttributes('Application-Name': 'Terasology Applet')
+   manifest.mainAttributes('Application-Library-Allowable-Codebase': '*')
+   manifest.mainAttributes('Caller-Allowable-Codebase': '*')
+   manifest.mainAttributes('Trusted-Only': 'false')
 }
 
 task syncIntoApplet(type:Sync) {
     into("$buildDir/$destDirApplet")
-    from ('README.markdown') {
+    from ("$rootDir/README.markdown") {
         filter(FixCrLfFilter, eol:FixCrLfFilter.CrLf.newInstance("crlf"))
         rename('README.markdown', 'README')
     }
-    from ('LICENSE') {
+    from ("$rootDir/LICENSE") {
         filter(FixCrLfFilter, eol:FixCrLfFilter.CrLf.newInstance("crlf"))
     }
-    from ('NOTICE') {
+    from ("$rootDir/NOTICE") {
         filter(FixCrLfFilter, eol:FixCrLfFilter.CrLf.newInstance("crlf"))
     }
     from jar
@@ -63,7 +74,7 @@ task createIndexHtml(type:Copy) {
     mustRunAfter syncIntoApplet
     def jars = []
     from project(":engine").configurations.runtime.each {
-        jars += 'lib/' + it.getName()
+        jars += 'libs/' + it.getName()
     }
     def modules = []
     subprojects.each { project ->
@@ -71,7 +82,7 @@ task createIndexHtml(type:Copy) {
             modules += project.name + '.jar'
         }
     }
-    from(dirApplet)
+    from('.')
     into("$buildDir/$destDirApplet")
     include 'index.html'
     expand(lwjglVersion: LWJGL_VERSION, jinputVersion : JINPUT_VERSION, jars : jars.join(", "), modules : modules.join(", "))
@@ -86,19 +97,48 @@ task distApplet {
 
 // At the end of the applet distribution sign the jar files so they can get expanded rights in a browser
 distApplet.doLast {
-    file("$buildDir/$destDirApplet").listFiles().each {
-        if (it.getName().endsWith(".jar"))
-            ant.signjar(jar: it, keystore: "$dirApplet/tera.keystore", alias: 'Terasology', storepass: 'Terasology')
+
+    if (!file('certum.jks').exists()) {
+        throw new GradleException("Copy the \"certum.jks\" keystore file in \"$projectDir\" first. See the README file on how to create the keystore.");
     }
-    file("$buildDir/$destDirApplet/$subDirLibs").listFiles().each {
-        if (it.getName().endsWith(".jar"))
-            ant.signjar(jar: it, keystore: "$dirApplet/tera.keystore", alias: 'Terasology', storepass: 'Terasology')
-    }
-    file("$buildDir/$destDirApplet/$subDirMods").listFiles().each {
-        if (it.getName().endsWith(".jar"))
-            ant.signjar(jar: it, keystore: "$dirApplet/tera.keystore", alias: 'Terasology', storepass: 'Terasology')
+
+    FileTree tree = fileTree(dir: "$buildDir/$destDirApplet")
+    
+    tree.include '*.jar'
+    tree.include "$subDirLibs/*.jar"
+    tree.include "$subDirModules/*.jar"
+    
+    tree.each {
+        // TODO: Remove this part as soon as LWJGL applet jars work correctly
+        if (it.getName().toLowerCase().startsWith('lwjgl')) {
+            logger.lifecycle("Re-signing invalid LWJGL file $it");
+            fixBrokenLwjglJar(it);
+            sign(it);
+        }
+        else if (!IsSigned.isSigned(it, null)) {
+            logger.lifecycle("Signing $it");
+            sign(it);
+        } else {
+            logger.lifecycle("File $it already signed");
+        }
     }
 }
+
+
+def sign(File it) {
+    ant.signjar(jar: it, keystore: "certum.jks", alias: 'cervator', storepass: 'Terasology', tsaurl: 'http://time.certum.pl/')
+}
+
+// Overwrite invalid AppLibAC attribute ("true") in LWJGL 2.9.1 jars
+def fixBrokenLwjglJar(File jar) {
+    ant.jar(destfile: jar, update: true) {
+        delegate.manifest {
+            attribute(name: 'Application-Library-Allowable-Codebase', value: '*')
+        }
+    }
+}
+
+
 
 task distAppletZip(type:Zip) {
     description = "Creates an Applet ZIP file from '$buildDir/$destDirApplet'"
