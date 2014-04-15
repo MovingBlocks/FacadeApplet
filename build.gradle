@@ -13,7 +13,7 @@ def JINPUT_VERSION = '2.0.5'
 ext {
     // Project paths
     subDirLibs = 'libs'
-    subDirModules = 'modules'
+    subDirModules = 'mods'
     destDirApplet = 'distributions/applet'
     jarFileName = 'Terasology.jar'
     templatesDir = file('templates')
@@ -48,6 +48,22 @@ jar {
    manifest.mainAttributes('Application-Library-Allowable-Codebase': '*')
    manifest.mainAttributes('Caller-Allowable-Codebase': '*')
    manifest.mainAttributes('Trusted-Only': 'false')
+}
+
+// Distribute modules - with the option to provide a list of additional modules to include as dependencies
+// Example command including additional modules: gradlew -PextraModules="Signalling,BlockNetwork"
+task addModules () {
+    description = "Prepares modules for distribution"
+
+    // If the execution was supplied with an extraModules property then include those modules as well
+    if (project.hasProperty('extraModules')) {
+        extraModules.split(',').each { String dependency ->
+            logger.lifecycle('Extra module: ' + dependency)
+            dependencies  {
+                modules (group: 'org.terasology.modules', name: dependency, version: '+')
+            }
+        }
+    }
 }
 
 task syncIntoApplet(type:Sync) {
@@ -85,7 +101,7 @@ task createIndexHtml(type:Copy) {
     
     def modules = []
     configurations.modules.each {
-        modules += subDirModules + '/' + it.getName()
+        modules += it.getName()
     }
     
     from('.')
@@ -94,9 +110,11 @@ task createIndexHtml(type:Copy) {
     expand(lwjglVersion: LWJGL_VERSION, jinputVersion : JINPUT_VERSION, jars : jars.join(", "), modules : modules.join(", "))
 }
 
+
 task distApplet {
     description = "Creates an Applet folder"
-    //dependsOn distModules
+    
+    dependsOn addModules
     dependsOn syncIntoApplet
     dependsOn createIndexHtml
 }
