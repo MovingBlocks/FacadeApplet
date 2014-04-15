@@ -13,9 +13,8 @@ def JINPUT_VERSION = '2.0.5'
 ext {
     // Project paths
     subDirLibs = 'libs'
-    subDirModules = 'mods'
+    subDirModules = 'modules'
     destDirApplet = 'distributions/applet'
-    destDirModules = "distributions/$subDirModules"
     jarFileName = 'Terasology.jar'
     templatesDir = file('templates')
 
@@ -29,13 +28,17 @@ ext {
 
 configurations {
     applet
+    modules {
+        description = 'Modules without deps'
+        transitive = false
+    }
 }
 
 dependencies {
     compile project(':engine')
     applet (group: 'org.lwjgl.lwjgl', name: 'lwjgl_util_applet', version: LWJGL_VERSION)
-    applet (group: 'org.nanoware.engine', name: 'engine', version: '+')
-    applet (group: 'org.nanoware.modules', name: 'Core', version: '+')
+    applet (group: 'org.terasology.engine', name: 'engine', version: '+')
+    modules (group: 'org.terasology.modules', name: 'Core', version: '+')
 }
 
 jar {
@@ -48,7 +51,8 @@ jar {
 }
 
 task syncIntoApplet(type:Sync) {
-    into("$buildDir/$destDirApplet")
+    description = "Copies all relevant files to the applet folder"
+    
     from ("$rootDir/README.markdown") {
         filter(FixCrLfFilter, eol:FixCrLfFilter.CrLf.newInstance("crlf"))
         rename('README.markdown', 'README')
@@ -59,29 +63,31 @@ task syncIntoApplet(type:Sync) {
     from ("$rootDir/NOTICE") {
         filter(FixCrLfFilter, eol:FixCrLfFilter.CrLf.newInstance("crlf"))
     }
-    from jar
-    from configurations.applet
+    from jar                              // this is the applet.jar file
+    into("$buildDir/$destDirApplet")
+    
     into(subDirLibs) {
-        from project(":engine").configurations.runtime
-        from rootProject.configurations.natives
+        from configurations.applet        // these are all applet deps.
     }
     into(subDirModules) {
-        from "$buildDir/$destDirModules"
+        from configurations.modules
     }
 }
 
 task createIndexHtml(type:Copy) {
     mustRunAfter syncIntoApplet
+
+    // add all libs to classpath
     def jars = []
-    from project(":engine").configurations.runtime.each {
-        jars += 'libs/' + it.getName()
+    configurations.applet.each {
+        jars += subDirLibs + '/' + it.getName()
     }
+    
     def modules = []
-    subprojects.each { project ->
-        if (project.name != 'mods') {
-            modules += project.name + '.jar'
-        }
+    configurations.modules.each {
+        modules += subDirModules + '/' + it.getName()
     }
+    
     from('.')
     into("$buildDir/$destDirApplet")
     include 'index.html'
