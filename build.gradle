@@ -141,6 +141,8 @@ distApplet.doLast {
         if (it.getName().toLowerCase().startsWith('lwjgl')) {
             logger.lifecycle("Re-signing invalid LWJGL file $it");
             fixBrokenLwjglJar(it);
+
+            final File v = it;
             pool.submit({ sign(v) });
         }
         else if (!IsSigned.isSigned(it, null)) {
