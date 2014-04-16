@@ -6,6 +6,8 @@ apply from: "$rootDir/config/gradle/common.gradle"
 import org.apache.tools.ant.filters.FixCrLfFilter;
 import org.apache.tools.ant.taskdefs.condition.IsSigned;
 
+import java.util.concurrent.*
+
 def LWJGL_VERSION = '2.9.1'
 def JINPUT_VERSION = '2.0.5'
 
@@ -132,24 +134,31 @@ distApplet.doLast {
     tree.include "$subDirLibs/*.jar"
     tree.include "$subDirModules/*.jar"
     
+    def pool = Executors.newCachedThreadPool()
+    
     tree.each {
         // TODO: Remove this part as soon as LWJGL applet jars work correctly
         if (it.getName().toLowerCase().startsWith('lwjgl')) {
             logger.lifecycle("Re-signing invalid LWJGL file $it");
             fixBrokenLwjglJar(it);
-            sign(it);
+            pool.submit({ sign(v) });
         }
         else if (!IsSigned.isSigned(it, null)) {
-            logger.lifecycle("Signing $it");
-            sign(it);
+            final File v = it;
+            pool.submit({ sign(v) });
         } else {
             logger.lifecycle("File $it already signed");
         }
     }
+    
+    pool.shutdown()
+    pool.awaitTermination(10, TimeUnit.MINUTES)
+    logger.lifecycle("Signing complete");
 }
 
 
 def sign(File it) {
+    logger.lifecycle("Signing $it");
     ant.signjar(jar: it, keystore: "certum.jks", alias: 'cervator', storepass: 'Terasology', tsaurl: 'http://time.certum.pl/')
 }
 
