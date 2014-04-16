@@ -6,6 +6,8 @@ apply from: "$rootDir/config/gradle/common.gradle"
 import org.apache.tools.ant.filters.FixCrLfFilter;
 import org.apache.tools.ant.taskdefs.condition.IsSigned;
 
+import java.util.concurrent.*
+
 def LWJGL_VERSION = '2.9.1'
 def JINPUT_VERSION = '2.0.5'
 
@@ -15,7 +17,6 @@ ext {
     subDirLibs = 'libs'
     subDirModules = 'mods'
     destDirApplet = 'distributions/applet'
-    destDirModules = "distributions/$subDirModules"
     jarFileName = 'Terasology.jar'
     templatesDir = file('templates')
 
@@ -29,13 +30,17 @@ ext {
 
 configurations {
     applet
+    modules {
+        description = 'Modules without deps'
+        transitive = false
+    }
 }
 
 dependencies {
     compile project(':engine')
     applet (group: 'org.lwjgl.lwjgl', name: 'lwjgl_util_applet', version: LWJGL_VERSION)
-    applet (group: 'org.nanoware.engine', name: 'engine', version: '+')
-    applet (group: 'org.nanoware.modules', name: 'Core', version: '+')
+    applet (group: 'org.terasology.engine', name: 'engine', version: '+')
+    modules (group: 'org.terasology.modules', name: 'Core', version: '+')
 }
 
 jar {
@@ -47,8 +52,25 @@ jar {
    manifest.mainAttributes('Trusted-Only': 'false')
 }
 
+// Distribute modules - with the option to provide a list of additional modules to include as dependencies
+// Example command including additional modules: gradlew -PextraModules="Signalling,BlockNetwork"
+task addModules () {
+    description = "Prepares modules for distribution"
+
+    // If the execution was supplied with an extraModules property then include those modules as well
+    if (project.hasProperty('extraModules')) {
+        extraModules.split(',').each { String dependency ->
+            logger.lifecycle('Extra module: ' + dependency)
+            dependencies  {
+                modules (group: 'org.terasology.modules', name: dependency, version: '+')
+            }
+        }
+    }
+}
+
 task syncIntoApplet(type:Sync) {
-    into("$buildDir/$destDirApplet")
+    description = "Copies all relevant files to the applet folder"
+    
     from ("$rootDir/README.markdown") {
         filter(FixCrLfFilter, eol:FixCrLfFilter.CrLf.newInstance("crlf"))
         rename('README.markdown', 'README')
@@ -59,38 +81,42 @@ task syncIntoApplet(type:Sync) {
     from ("$rootDir/NOTICE") {
         filter(FixCrLfFilter, eol:FixCrLfFilter.CrLf.newInstance("crlf"))
     }
-    from jar
-    from configurations.applet
+    from jar                              // this is the applet.jar file
+    into("$buildDir/$destDirApplet")
+    
     into(subDirLibs) {
-        from project(":engine").configurations.runtime
-        from rootProject.configurations.natives
+        from configurations.applet        // these are all applet deps.
     }
     into(subDirModules) {
-        from "$buildDir/$destDirModules"
+        from configurations.modules
     }
 }
 
 task createIndexHtml(type:Copy) {
     mustRunAfter syncIntoApplet
+
+    // add all libs to classpath
     def jars = []
-    from project(":engine").configurations.runtime.each {
-        jars += 'libs/' + it.getName()
+    configurations.applet.each {
+        jars += subDirLibs + '/' + it.getName()
     }
+    
     def modules = []
-    subprojects.each { project ->
-        if (project.name != 'mods') {
-            modules += project.name + '.jar'
-        }
+    configurations.modules.each {
+        modules += it.getName()
     }
+    
     from('.')
     into("$buildDir/$destDirApplet")
     include 'index.html'
     expand(lwjglVersion: LWJGL_VERSION, jinputVersion : JINPUT_VERSION, jars : jars.join(", "), modules : modules.join(", "))
 }
 
+
 task distApplet {
     description = "Creates an Applet folder"
-    //dependsOn distModules
+    
+    dependsOn addModules
     dependsOn syncIntoApplet
     dependsOn createIndexHtml
 }
@@ -108,24 +134,33 @@ distApplet.doLast {
     tree.include "$subDirLibs/*.jar"
     tree.include "$subDirModules/*.jar"
     
+    def pool = Executors.newCachedThreadPool()
+    
     tree.each {
         // TODO: Remove this part as soon as LWJGL applet jars work correctly
         if (it.getName().toLowerCase().startsWith('lwjgl')) {
             logger.lifecycle("Re-signing invalid LWJGL file $it");
             fixBrokenLwjglJar(it);
-            sign(it);
+
+            final File v = it;
+            pool.submit({ sign(v) });
         }
         else if (!IsSigned.isSigned(it, null)) {
-            logger.lifecycle("Signing $it");
-            sign(it);
+            final File v = it;
+            pool.submit({ sign(v) });
         } else {
             logger.lifecycle("File $it already signed");
         }
     }
+    
+    pool.shutdown()
+    pool.awaitTermination(10, TimeUnit.MINUTES)
+    logger.lifecycle("Signing complete");
 }
 
 
 def sign(File it) {
+    logger.lifecycle("Signing $it");
     ant.signjar(jar: it, keystore: "certum.jks", alias: 'cervator', storepass: 'Terasology', tsaurl: 'http://time.certum.pl/')
 }
 
