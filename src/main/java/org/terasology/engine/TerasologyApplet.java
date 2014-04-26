@@ -36,7 +36,6 @@ import java.nio.channels.Channels;
 import java.nio.channels.ReadableByteChannel;
 import java.nio.channels.SeekableByteChannel;
 import java.nio.file.Files;
-import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.util.Collection;
 
@@ -44,8 +43,10 @@ import java.util.Collection;
  * @author Benjamin Glatzel <benjamin.glatzel@me.com>
  * @author Rasmus 'Cervator' Praestholm <cervator@gmail.com>
  */
-@SuppressWarnings("serial")
 public final class TerasologyApplet extends Applet {
+
+    private static final long serialVersionUID = -5223097421609941428L;
+    
     private static Logger logger;
     private TerasologyEngine engine;
     private Thread gameThread;
@@ -65,14 +66,18 @@ public final class TerasologyApplet extends Applet {
 
     private void obtainMods() {
         String[] mods = getParameter("modules").split(",");
-        String modsPath = getParameter("mods_path") + "mods/";
-        for (String mod : mods) {
+
+        for (String modRaw : mods) {
             try {
-                URL url = new URL(modsPath + mod);
+                String mod = modRaw.trim();
+                URL url = new URL(getCodeBase(), "mods/" + mod);
+                
+                logger.info("Downloading " + url);
+                
                 try (ReadableByteChannel rbc = Channels.newChannel(url.openStream());
                      SeekableByteChannel writeChannel = Files.newByteChannel(PathManager.getInstance().getHomeModPath().resolve(mod),
                              StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.WRITE)) {
-                    ByteBuffer buffer = ByteBuffer.allocateDirect(1 << 24);
+                    ByteBuffer buffer = ByteBuffer.allocateDirect(1 << 16);
                     while (rbc.read(buffer) != -1) {
                         buffer.flip();
                         writeChannel.write(buffer);
@@ -86,7 +91,7 @@ public final class TerasologyApplet extends Applet {
                     logger.error("Unable to obtain module '{}'", mod, e);
                 }
             } catch (MalformedURLException e) {
-                logger.error("Unable to obtain module '{}'", mod, e);
+                logger.error("Unable to obtain module '{}'", modRaw, e);
             }
 
 
