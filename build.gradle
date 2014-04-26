@@ -135,13 +135,19 @@ distApplet.doLast {
     tree.include "$subDirModules/*.jar"
     
     def pool = Executors.newCachedThreadPool()
-    
+
+    tree.each {
+        // TODO: Remove this part as soon as LWJGL applet jars work correctly
+        if (it.getName().toLowerCase().startsWith('lwjgl')) {
+            logger.lifecycle("Fixing manifest in invalid LWJGL file $it");
+            fixBrokenLwjglJar(it);
+        }
+    }
+
     tree.each {
         // TODO: Remove this part as soon as LWJGL applet jars work correctly
         if (it.getName().toLowerCase().startsWith('lwjgl')) {
             logger.lifecycle("Re-signing invalid LWJGL file $it");
-            fixBrokenLwjglJar(it);
-
             final File v = it;
             pool.submit({ sign(v) });
         }
@@ -161,7 +167,8 @@ distApplet.doLast {
 
 def sign(File it) {
     logger.lifecycle("Signing $it");
-    ant.signjar(jar: it, keystore: "certum.jks", alias: 'cervator', storepass: 'Terasology', tsaurl: 'http://time.certum.pl/')
+    // Passwords are stored outside source control in a user or Jenkins supplied gradle.properties. This naturally won't work without
+    ant.signjar(jar: it, keystore: "certum.jks", alias: 'cervator', storepass: certificateStorePass, keypass: certificateKeyPass, tsaurl: 'http://time.certum.pl/')
 }
 
 // Overwrite invalid AppLibAC attribute ("true") in LWJGL 2.9.1 jars
