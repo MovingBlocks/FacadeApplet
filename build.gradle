@@ -37,9 +37,8 @@ configurations {
 }
 
 dependencies {
-    compile project(':engine')
-    applet (group: 'org.lwjgl.lwjgl', name: 'lwjgl_util_applet', version: LWJGL_VERSION)
-    applet (group: 'org.terasology.engine', name: 'engine', version: '+')
+    compile (group: 'org.lwjgl.lwjgl', name: 'lwjgl_util_applet', version: LWJGL_VERSION)
+    compile (group: 'org.terasology.engine', name: 'engine', version: '+')
     modules (group: 'org.terasology.modules', name: 'Core', version: '+')
 }
 
@@ -85,7 +84,7 @@ task syncIntoApplet(type:Sync) {
     into("$buildDir/$destDirApplet")
     
     into(subDirLibs) {
-        from configurations.applet        // these are all applet deps.
+        from configurations.compile        // these are all applet deps.
     }
     into(subDirModules) {
         from configurations.modules
@@ -97,7 +96,7 @@ task createIndexHtml(type:Copy) {
 
     // add all libs to classpath
     def jars = []
-    configurations.applet.each {
+    configurations.compile.each {
         jars += subDirLibs + '/' + it.getName()
     }
     
