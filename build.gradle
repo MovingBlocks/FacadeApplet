@@ -127,6 +127,14 @@ distApplet.doLast {
         throw new GradleException("Copy the \"certum.jks\" keystore file in \"$projectDir\" first. See the README file on how to create the keystore.");
     }
 
+    if (!rootProject.hasProperty('certificateKeyPass') && !project.hasProperty('certificateKeyPass')) {
+        throw new GradleException('You need to define "certificateKeyPass"');
+    }
+
+    if (!rootProject.hasProperty('certificateStorePass') && !project.hasProperty('certificateStorePass')) {
+        throw new GradleException('You need to define "certificateStorePass"');
+    }
+
     FileTree tree = fileTree(dir: "$buildDir/$destDirApplet")
     
     tree.include '*.jar'
@@ -167,7 +175,12 @@ distApplet.doLast {
 def sign(File it) {
     logger.lifecycle("Signing $it");
     // Passwords are stored outside source control in a user or Jenkins supplied gradle.properties. This naturally won't work without
-    ant.signjar(jar: it, keystore: "certum.jks", alias: 'cervator', storepass: certificateStorePass, keypass: certificateKeyPass, tsaurl: 'http://time.certum.pl/')
+	try {
+		ant.signjar(jar: it, keystore: "certum.jks", alias: 'cervator', storepass: certificateStorePass, keypass: certificateKeyPass, tsaurl: 'http://time.certum.pl/')
+	} catch (Exception e) {
+		// if we don't catch them here, they will be eaten silently :-(
+		logger.warn(e.toString())
+	}
 }
 
 // Overwrite invalid AppLibAC attribute ("true") in LWJGL 2.9.1 jars
