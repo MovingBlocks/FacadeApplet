@@ -15,7 +15,21 @@
  */
 package org.terasology.engine;
 
-import com.google.common.collect.Lists;
+import java.applet.Applet;
+import java.awt.BorderLayout;
+import java.io.IOException;
+import java.net.MalformedURLException;
+import java.net.URL;
+import java.nio.ByteBuffer;
+import java.nio.channels.Channels;
+import java.nio.channels.ReadableByteChannel;
+import java.nio.channels.SeekableByteChannel;
+import java.nio.file.Files;
+import java.nio.file.StandardOpenOption;
+import java.util.Collection;
+
+import javax.swing.JScrollPane;
+import javax.swing.JTextArea;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -27,17 +41,11 @@ import org.terasology.engine.subsystem.lwjgl.LwjglGraphics;
 import org.terasology.engine.subsystem.lwjgl.LwjglInput;
 import org.terasology.engine.subsystem.lwjgl.LwjglTimer;
 
-import java.applet.Applet;
-import java.io.IOException;
-import java.net.MalformedURLException;
-import java.net.URL;
-import java.nio.ByteBuffer;
-import java.nio.channels.Channels;
-import java.nio.channels.ReadableByteChannel;
-import java.nio.channels.SeekableByteChannel;
-import java.nio.file.Files;
-import java.nio.file.StandardOpenOption;
-import java.util.Collection;
+import ch.qos.logback.classic.LoggerContext;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.AppenderBase;
+
+import com.google.common.collect.Lists;
 
 /**
  * @author Benjamin Glatzel <benjamin.glatzel@me.com>
@@ -54,6 +62,17 @@ public final class TerasologyApplet extends Applet {
     @Override
     public void init() {
         super.init();
+        
+        setLayout(new BorderLayout());
+
+        // fill the applet with a scrollable text area
+        final JTextArea textArea = new JTextArea();
+        textArea.setEditable(false);
+        add(new JScrollPane(textArea), BorderLayout.CENTER);
+        validate();
+        
+        attachRootLogAppender(textArea);
+        
         try {
             PathManager.getInstance().useDefaultHomePath();
         } catch (IOException e) {
@@ -62,6 +81,23 @@ public final class TerasologyApplet extends Applet {
         logger = LoggerFactory.getLogger(TerasologyApplet.class);
         obtainMods();
         startGame();
+    }
+
+    private void attachRootLogAppender(final JTextArea textArea) {
+        Logger rootLogger = LoggerFactory.getLogger(Logger.ROOT_LOGGER_NAME);
+        ch.qos.logback.classic.Logger log = (ch.qos.logback.classic.Logger) rootLogger;
+        LoggerContext context = (LoggerContext) LoggerFactory.getILoggerFactory();
+        AppenderBase<ILoggingEvent> appender = new AppenderBase<ILoggingEvent>() {
+
+            @Override
+            protected void append(ILoggingEvent eventObject) {
+                textArea.append(eventObject.getFormattedMessage() + System.lineSeparator());
+            }
+        };
+        appender.setContext(context);
+        appender.start();
+        log.addAppender(appender);
+        log.info("Applet log appender attached");
     }
 
     private void obtainMods() {
@@ -134,7 +170,9 @@ public final class TerasologyApplet extends Applet {
             engine.shutdown();
         }
         try {
-            gameThread.join();
+            if (gameThread != null) {
+                gameThread.join();
+            }
         } catch (InterruptedException e) {
             if (logger != null) {
                 logger.error("Failed to cleanly shut down engine", e);
