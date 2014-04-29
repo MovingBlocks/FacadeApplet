@@ -69,7 +69,8 @@ public final class TerasologyApplet extends Applet {
         final JTextArea textArea = new JTextArea();
         textArea.setEditable(false);
         add(new JScrollPane(textArea), BorderLayout.CENTER);
-
+        validate();
+        
         attachRootLogAppender(textArea);
         
         try {
@@ -169,7 +170,9 @@ public final class TerasologyApplet extends Applet {
             engine.shutdown();
         }
         try {
-            gameThread.join();
+            if (gameThread != null) {
+                gameThread.join();
+            }
         } catch (InterruptedException e) {
             if (logger != null) {
                 logger.error("Failed to cleanly shut down engine", e);
