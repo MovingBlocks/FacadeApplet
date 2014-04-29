@@ -93,10 +93,16 @@ task syncIntoApplet(type:Sync) {
 
 task createIndexHtml(type:Copy) {
     mustRunAfter syncIntoApplet
-
+	
+    def noNatives = files(configurations.compile).filter {
+        !it.name.endsWith('natives-linux.jar') &&
+        !it.name.endsWith('natives-windows.jar') &&
+        !it.name.endsWith('natives-osx.jar')
+    }
+    
     // add all libs to classpath
     def jars = []
-    configurations.compile.each {
+    noNatives.each {
         jars += subDirLibs + '/' + it.getName()
     }
     
@@ -105,12 +111,10 @@ task createIndexHtml(type:Copy) {
         modules += it.getName()
     }
     
-    from('.')
+    from('index.html')
     into("$buildDir/$destDirApplet")
-    include 'index.html'
     expand(lwjglVersion: LWJGL_VERSION, jinputVersion : JINPUT_VERSION, jars : jars.join(", "), modules : modules.join(", "))
 }
-
 
 task distApplet {
     description = "Creates an Applet folder"
