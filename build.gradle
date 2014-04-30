@@ -15,7 +15,7 @@ def JINPUT_VERSION = '2.0.5'
 ext {
     // Project paths
     subDirLibs = 'libs'
-    subDirModules = 'mods'
+    subDirModules = 'modules'
     destDirApplet = 'distributions/applet'
     jarFileName = 'Terasology.jar'
     templatesDir = file('templates')

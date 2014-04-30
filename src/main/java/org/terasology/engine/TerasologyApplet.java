@@ -79,7 +79,7 @@ public final class TerasologyApplet extends Applet {
             throw new RuntimeException("Failed to start applet - could not obtain home path.", e);
         }
         logger = LoggerFactory.getLogger(TerasologyApplet.class);
-        obtainMods();
+        obtainModules();
         startGame();
     }
 
@@ -100,13 +100,13 @@ public final class TerasologyApplet extends Applet {
         log.info("Applet log appender attached");
     }
 
-    private void obtainMods() {
-        String[] mods = getParameter("modules").split(",");
+    private void obtainModules() {
+        String[] modules = getParameter("modules").split(",");
 
-        for (String modRaw : mods) {
+        for (String modRaw : modules) {
             try {
                 String mod = modRaw.trim();
-                URL url = new URL(getCodeBase(), "mods/" + mod);
+                URL url = new URL(getCodeBase(), "modules/" + mod);
                 
                 logger.info("Downloading " + url);
                 
