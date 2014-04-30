@@ -6,6 +6,7 @@ build/
 *.launch
 *.iml
 /bin
+/.gradle/
 
 # Do not EVER put this file into the repository
 certum.jks
