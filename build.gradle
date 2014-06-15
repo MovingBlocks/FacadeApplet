@@ -14,11 +14,10 @@ def JINPUT_VERSION = '2.0.5'
 // Declare "extra properties" (variables) for the project - a Gradle thing that makes them special.
 ext {
     // Project paths
+    dirUnsigned = "$buildDir/unsigned"
     subDirLibs = 'libs'
     subDirModules = 'modules'
     destDirApplet = 'distributions/applet'
-    jarFileName = 'Terasology.jar'
-    templatesDir = file('templates')
 
     // Read environment variables, including variables passed by jenkins continuous integration server
     env = System.getenv()
@@ -67,8 +66,8 @@ task addModules () {
     }
 }
 
-task syncIntoApplet(type:Sync) {
-    description = "Copies all relevant files to the applet folder"
+task copyExtras(type:Copy) {
+    description = "Copies all extras to the applet folder"
     
     from ("$rootDir/README.markdown") {
         filter(FixCrLfFilter, eol:FixCrLfFilter.CrLf.newInstance("crlf"))
@@ -80,21 +79,45 @@ task syncIntoApplet(type:Sync) {
     from ("$rootDir/NOTICE") {
         filter(FixCrLfFilter, eol:FixCrLfFilter.CrLf.newInstance("crlf"))
     }
-    from jar                              // this is the applet.jar file
+
     into("$buildDir/$destDirApplet")
-    
+}
+
+task copyLibs(type:Copy, dependsOn: addModules) {
+    description = "Copies all libs to the applet folder"
+	
+    into(dirUnsigned)
+	from jar                           	    // this is the applet.jar file
+
     into(subDirLibs) {
-        from configurations.compile        // these are all applet deps.
+        from configurations.runtime         // these are all applet deps.
     }
+	
     into(subDirModules) {
         from configurations.modules
     }
+	
+	// TODO: Remove this part as soon as LWJGL applet jars work correctly
+	// see https://github.com/LWJGL/lwjgl/pull/73
+    // Overwrite invalid AppLibAC attribute ("true") in LWJGL 2.9.1 jars
+    def lwjglFiles = fileTree(dir: "$dirUnsigned/$subDirLibs", include: 'lwjgl_util*.jar')
+	
+    doLast {
+		lwjglFiles.each {
+			logger.lifecycle("Fixing manifest in invalid LWJGL file $it");
+			ant.jar(destfile: it, update: true) {
+				delegate.manifest {
+					attribute(name: 'Application-Library-Allowable-Codebase', value: '*')
+				}
+			}
+		}
+	}	
 }
 
+
 task createIndexHtml(type:Copy) {
-    mustRunAfter syncIntoApplet
-	
-    def noNatives = files(configurations.compile).filter {
+    
+    def noNatives = files(configurations.runtime).filter {
         !it.name.endsWith('natives-linux.jar') &&
         !it.name.endsWith('natives-windows.jar') &&
         !it.name.endsWith('natives-osx.jar')
@@ -116,87 +139,71 @@ task createIndexHtml(type:Copy) {
     expand(lwjglVersion: LWJGL_VERSION, jinputVersion : JINPUT_VERSION, jars : jars.join(", "), modules : modules.join(", "))
 }
 
-task distApplet {
-    description = "Creates an Applet folder"
-    
-    dependsOn addModules
-    dependsOn syncIntoApplet
-    dependsOn createIndexHtml
-}
+class IncrementalSigningTask extends DefaultTask {
 
-// At the end of the applet distribution sign the jar files so they can get expanded rights in a browser
-distApplet.doLast {
+    @Input
+    String certFile
 
-    if (!file('certum.jks').exists()) {
-        throw new GradleException("Copy the \"certum.jks\" keystore file in \"$projectDir\" first. See the README file on how to create the keystore.");
-    }
+    @Input
+    String certAlias
 
-    if (!rootProject.hasProperty('certificateKeyPass') && !project.hasProperty('certificateKeyPass')) {
-        throw new GradleException('You need to define "certificateKeyPass"');
-    }
+    @Input
+    String certStorePass
 
-    if (!rootProject.hasProperty('certificateStorePass') && !project.hasProperty('certificateStorePass')) {
-        throw new GradleException('You need to define "certificateStorePass"');
-    }
+    @Input
+    String certKeyPass
 
-    FileTree tree = fileTree(dir: "$buildDir/$destDirApplet")
-    
-    tree.include '*.jar'
-    tree.include "$subDirLibs/*.jar"
-    tree.include "$subDirModules/*.jar"
-    
-    def pool = Executors.newCachedThreadPool()
+    @OutputDirectory
+    File outputDir
 
-    tree.each {
-        // TODO: Remove this part as soon as LWJGL applet jars work correctly
-        if (it.getName().toLowerCase().startsWith('lwjgl')) {
-            logger.lifecycle("Fixing manifest in invalid LWJGL file $it");
-            fixBrokenLwjglJar(it);
+    @TaskAction
+    void execute(IncrementalTaskInputs inputs) {
+
+        outputDir.mkdirs()
+
+        def pool = Executors.newCachedThreadPool()
+
+        inputs.outOfDate { change ->
+            pool.submit({
+
+                def target = new File(outputDir, change.file.name)
+
+                ant.signjar(
+                    jar: change.file,
+                    signedjar: target,
+                    keystore: certFile,
+                    alias: certAlias,
+                    storepass: certStorePass,
+                    keypass: certKeyPass,
+                    tsaurl: 'http://time.certum.pl/')
+
+                logger.lifecycle("Signed ${change.file.name}");
+            });
         }
-    }
 
-    tree.each {
-        // TODO: Remove this part as soon as LWJGL applet jars work correctly
-        if (it.getName().toLowerCase().startsWith('lwjgl')) {
-            logger.lifecycle("Re-signing invalid LWJGL file $it");
-            final File v = it;
-            pool.submit({ sign(v) });
-        }
-        else if (!IsSigned.isSigned(it, null)) {
-            final File v = it;
-            pool.submit({ sign(v) });
-        } else {
-            logger.lifecycle("File $it already signed");
-        }
-    }
-    
-    pool.shutdown()
-    pool.awaitTermination(10, TimeUnit.MINUTES)
-    logger.lifecycle("Signing complete");
-}
-
-
-def sign(File it) {
-    logger.lifecycle("Signing $it");
-    // Passwords are stored outside source control in a user or Jenkins supplied gradle.properties. This naturally won't work without
-	try {
-		ant.signjar(jar: it, keystore: "certum.jks", alias: 'cervator', storepass: certificateStorePass, keypass: certificateKeyPass, tsaurl: 'http://time.certum.pl/')
-	} catch (Exception e) {
-		// if we don't catch them here, they will be eaten silently :-(
-		logger.warn(e.toString())
-	}
-}
-
-// Overwrite invalid AppLibAC attribute ("true") in LWJGL 2.9.1 jars
-def fixBrokenLwjglJar(File jar) {
-    ant.jar(destfile: jar, update: true) {
-        delegate.manifest {
-            attribute(name: 'Application-Library-Allowable-Codebase', value: '*')
-        }
+        pool.shutdown()
+        pool.awaitTermination(10, TimeUnit.MINUTES)
+        logger.lifecycle("Signing complete")
     }
 }
 
 
+// Sign the jar files so they can get full rights in a browser
+task signLibs(type: IncrementalSigningTask, dependsOn: [copyLibs]) {
+
+	inputs.files fileTree(dirUnsigned)
+    outputDir = file("$buildDir/$destDirApplet")
+
+    certFile = certificateFile
+    certAlias = certificateAlias
+    certStorePass = certificateStorePass
+    certKeyPass = certificateKeyPass
+}
+
+
+task distApplet(dependsOn: signLibs) {
+    description = "Creates an Applet folder"  
+}
 
 task distAppletZip(type:Zip) {
     description = "Creates an Applet ZIP file from '$buildDir/$destDirApplet'"
