@@ -152,6 +152,9 @@ class IncrementalSigningTask extends DefaultTask {
 
     @Input
     String certKeyPass
+	
+	@InputFiles
+	FileTree inputTree
 
     @OutputDirectory
     File outputDir
@@ -161,23 +164,38 @@ class IncrementalSigningTask extends DefaultTask {
 
         outputDir.mkdirs()
 
+		def ood = new HashSet()
+		inputs.outOfDate( {
+			ood += it.file
+		})
+		
         def pool = Executors.newCachedThreadPool()
 
-        inputs.outOfDate { change ->
-            pool.submit({
+		logger.info("Signing with certifacte $certFile")
+		
+		inputTree.visit { change ->
+		
+			if (change.directory) {
+				change.relativePath.getFile(outputDir).mkdirs() 
+			} else if (ood.contains(change.file))
+				pool.submit({
+				try {
+					def target = change.relativePath.getFile(outputDir)
+					logger.debug("Signing file $change.file")
+					logger.debug("Storing signed file $target")
+					ant.signjar(
+						jar: change.file,
+						signedjar: target,
+						keystore: certFile,
+						alias: certAlias,
+						storepass: certStorePass,
+						keypass: certKeyPass,
+						tsaurl: 'http://time.certum.pl/')
+				} catch (Exception e) {
+					logger.warn("Error signing", e)
+				}
 
-                def target = new File(outputDir, change.file.name)
-
-                ant.signjar(
-                    jar: change.file,
-                    signedjar: target,
-                    keystore: certFile,
-                    alias: certAlias,
-                    storepass: certStorePass,
-                    keypass: certKeyPass,
-                    tsaurl: 'http://time.certum.pl/')
-
-                logger.lifecycle("Signed ${change.file.name}");
+                logger.lifecycle("Signed $it.relativePath");
             });
         }
 
@@ -191,7 +209,7 @@ class IncrementalSigningTask extends DefaultTask {
 // Sign the jar files so they can get full rights in a browser
 task signLibs(type: IncrementalSigningTask, dependsOn: [copyLibs]) {
 
-	inputs.files fileTree(dirUnsigned)
+	inputTree = fileTree(dirUnsigned)
     outputDir = file("$buildDir/$destDirApplet")
 
     certFile = certificateFile
