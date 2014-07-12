@@ -219,7 +219,7 @@ task signLibs(type: IncrementalSigningTask, dependsOn: [copyLibs]) {
 }
 
 
-task distApplet(dependsOn: signLibs) {
+task distApplet(dependsOn: [signLibs, createIndexHtml, copyExtras]) {
     description = "Creates an Applet folder"  
 }
 
