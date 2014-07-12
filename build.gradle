@@ -85,33 +85,33 @@ task copyExtras(type:Copy) {
 
 task copyLibs(type:Copy, dependsOn: addModules) {
     description = "Copies all libs to the applet folder"
-	
+    
     into(dirUnsigned)
-	from jar                           	    // this is the applet.jar file
+    from jar                                   // this is the applet.jar file
 
     into(subDirLibs) {
         from configurations.runtime         // these are all applet deps.
     }
-	
+    
     into(subDirModules) {
         from configurations.modules
     }
-	
-	// TODO: Remove this part as soon as LWJGL applet jars work correctly
-	// see https://github.com/LWJGL/lwjgl/pull/73
+    
+    // TODO: Remove this part as soon as LWJGL applet jars work correctly
+    // see https://github.com/LWJGL/lwjgl/pull/73
     // Overwrite invalid AppLibAC attribute ("true") in LWJGL 2.9.1 jars
     def lwjglFiles = fileTree(dir: "$dirUnsigned/$subDirLibs", include: 'lwjgl_util*.jar')
-	
+    
     doLast {
-		lwjglFiles.each {
-			logger.lifecycle("Fixing manifest in invalid LWJGL file $it");
-			ant.jar(destfile: it, update: true) {
-				delegate.manifest {
-					attribute(name: 'Application-Library-Allowable-Codebase', value: '*')
-				}
-			}
-		}
-	}	
+        lwjglFiles.each {
+            logger.lifecycle("Fixing manifest in invalid LWJGL file $it");
+            ant.jar(destfile: it, update: true) {
+                delegate.manifest {
+                    attribute(name: 'Application-Library-Allowable-Codebase', value: '*')
+                }
+            }
+        }
+    }    
 }
 
 
@@ -152,9 +152,9 @@ class IncrementalSigningTask extends DefaultTask {
 
     @Input
     String certKeyPass
-	
-	@InputFiles
-	FileTree inputTree
+    
+    @InputFiles
+    FileTree inputTree
 
     @OutputDirectory
     File outputDir
@@ -164,34 +164,34 @@ class IncrementalSigningTask extends DefaultTask {
 
         outputDir.mkdirs()
 
-		def ood = new HashSet()
-		inputs.outOfDate( {
-			ood += it.file
-		})
- 		
-		logger.info("Signing with certifacte $certFile")
-		
-		inputTree.visit { change ->
-		
-			if (change.directory) {
-				change.relativePath.getFile(outputDir).mkdirs() 
-			} else if (ood.contains(change.file)) {
-     			try {
-					def target = change.relativePath.getFile(outputDir)
-					logger.debug("Signing file $change.file")
-					logger.debug("Storing signed file $target")
-					ant.signjar(
-						jar: change.file,
-						signedjar: target,
-						keystore: certFile,
-						alias: certAlias,
-						storepass: certStorePass,
-						keypass: certKeyPass,
-						tsaurl: 'http://time.certum.pl/')
-				} catch (Exception e) {
-					logger.warn("Error signing", e)
-				}
-			}
+        def ood = new HashSet()
+        inputs.outOfDate( {
+            ood += it.file
+        })
+         
+        logger.info("Signing with certifacte $certFile")
+        
+        inputTree.visit { change ->
+        
+            if (change.directory) {
+                change.relativePath.getFile(outputDir).mkdirs() 
+            } else if (ood.contains(change.file)) {
+                 try {
+                    def target = change.relativePath.getFile(outputDir)
+                    logger.debug("Signing file $change.file")
+                    logger.debug("Storing signed file $target")
+                    ant.signjar(
+                        jar: change.file,
+                        signedjar: target,
+                        keystore: certFile,
+                        alias: certAlias,
+                        storepass: certStorePass,
+                        keypass: certKeyPass,
+                        tsaurl: 'http://time.certum.pl/')
+                } catch (Exception e) {
+                    logger.warn("Error signing", e)
+                }
+            }
             logger.lifecycle("Signed $change.relativePath");
         }
 
@@ -203,7 +203,7 @@ class IncrementalSigningTask extends DefaultTask {
 // Sign the jar files so they can get full rights in a browser
 task signLibs(type: IncrementalSigningTask, dependsOn: [copyLibs]) {
 
-	inputTree = fileTree(dirUnsigned)
+    inputTree = fileTree(dirUnsigned)
     outputDir = file("$buildDir/$destDirApplet")
 
     certFile = certificateFile
