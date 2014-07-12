@@ -168,18 +168,15 @@ class IncrementalSigningTask extends DefaultTask {
 		inputs.outOfDate( {
 			ood += it.file
 		})
-		
-        def pool = Executors.newCachedThreadPool()
-
+ 		
 		logger.info("Signing with certifacte $certFile")
 		
 		inputTree.visit { change ->
 		
 			if (change.directory) {
 				change.relativePath.getFile(outputDir).mkdirs() 
-			} else if (ood.contains(change.file))
-				pool.submit({
-				try {
+			} else if (ood.contains(change.file)) {
+     			try {
 					def target = change.relativePath.getFile(outputDir)
 					logger.debug("Signing file $change.file")
 					logger.debug("Storing signed file $target")
@@ -194,13 +191,10 @@ class IncrementalSigningTask extends DefaultTask {
 				} catch (Exception e) {
 					logger.warn("Error signing", e)
 				}
-
-                logger.lifecycle("Signed $it.relativePath");
-            });
+			}
+            logger.lifecycle("Signed $change.relativePath");
         }
 
-        pool.shutdown()
-        pool.awaitTermination(10, TimeUnit.MINUTES)
         logger.lifecycle("Signing complete")
     }
 }
