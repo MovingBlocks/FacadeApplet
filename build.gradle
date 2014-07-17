@@ -81,14 +81,14 @@ task addModules () {
 task copyExtras(type:Copy) {
     description = "Copies all extras to the applet folder"
     
-    from ("$rootDir/README.markdown") {
+    from ("README.md") {
         filter(FixCrLfFilter, eol:FixCrLfFilter.CrLf.newInstance("crlf"))
-        rename('README.markdown', 'README')
+        rename('README.md', 'README')
     }
-    from ("$rootDir/LICENSE") {
+    from ("LICENSE") {
         filter(FixCrLfFilter, eol:FixCrLfFilter.CrLf.newInstance("crlf"))
     }
-    from ("$rootDir/NOTICE") {
+    from ("NOTICE") {
         filter(FixCrLfFilter, eol:FixCrLfFilter.CrLf.newInstance("crlf"))
     }
 
