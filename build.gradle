@@ -23,7 +23,8 @@ ext {
 configurations {
     applet
     modules {
-        description = 'Modules without deps'
+        description = 'Modules without dependencies'
+        // This is needed as otherwise any included module would also get copied in with engine libs etc
         transitive = false
     }
 }
@@ -217,5 +218,6 @@ task distApplet(dependsOn: [signLibs, createIndexHtml, copyExtras]) {
 task distAppletZip(type:Zip) {
     description = "Creates an Applet ZIP file from '$buildDir/$destDirApplet'"
     dependsOn distApplet
+    archiveName = "applet.zip"
     from "$buildDir/$destDirApplet"
 }
