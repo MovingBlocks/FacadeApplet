@@ -4,9 +4,6 @@
 apply from: "$rootDir/config/gradle/common.gradle"
 
 import org.apache.tools.ant.filters.FixCrLfFilter;
-import org.apache.tools.ant.taskdefs.condition.IsSigned;
-
-import java.util.concurrent.*
 
 def LWJGL_VERSION = '2.9.1'
 def JINPUT_VERSION = '2.0.5'
@@ -23,10 +20,6 @@ ext {
     env = System.getenv()
 }
 
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Applet
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 configurations {
     applet
     modules {
@@ -42,12 +35,14 @@ dependencies {
 }
 
 jar {
-   manifest.mainAttributes('Permissions': 'all-permissions')
-   manifest.mainAttributes('Codebase': '*')
-   manifest.mainAttributes('Application-Name': 'Terasology Applet')
-   manifest.mainAttributes('Application-Library-Allowable-Codebase': '*')
-   manifest.mainAttributes('Caller-Allowable-Codebase': '*')
-   manifest.mainAttributes('Trusted-Only': 'false')
+    archiveName = "applet.jar"
+
+    manifest.mainAttributes('Permissions': 'all-permissions')
+    manifest.mainAttributes('Codebase': '*')
+    manifest.mainAttributes('Application-Name': 'Terasology Applet')
+    manifest.mainAttributes('Application-Library-Allowable-Codebase': '*')
+    manifest.mainAttributes('Caller-Allowable-Codebase': '*')
+    manifest.mainAttributes('Trusted-Only': 'false')
 }
 
 // Distribute modules - with the option to provide a list of additional modules to include as dependencies
@@ -87,12 +82,16 @@ task copyLibs(type:Copy, dependsOn: addModules) {
     description = "Copies all libs to the applet folder"
     
     into(dirUnsigned)
-    from jar                                   // this is the applet.jar file
 
+    // Applet jar itself
+    from jar
+
+    // Lib jars
     into(subDirLibs) {
-        from configurations.runtime         // these are all applet deps.
+        from configurations.runtime
     }
-    
+
+    // Modules (just Core unless extraModules is passed in)
     into(subDirModules) {
         from configurations.modules
     }
@@ -113,7 +112,6 @@ task copyLibs(type:Copy, dependsOn: addModules) {
         }
     }    
 }
-
 
 task createIndexHtml(type:Copy) {
     
@@ -139,6 +137,7 @@ task createIndexHtml(type:Copy) {
     expand(lwjglVersion: LWJGL_VERSION, jinputVersion : JINPUT_VERSION, jars : jars.join(", "), modules : modules.join(", "))
 }
 
+// TODO: Maybe split this out as a tiny plugin or something sometime?
 class IncrementalSigningTask extends DefaultTask {
 
     @Input
@@ -194,11 +193,9 @@ class IncrementalSigningTask extends DefaultTask {
             }
             logger.lifecycle("Signed $change.relativePath");
         }
-
         logger.lifecycle("Signing complete")
     }
 }
-
 
 // Sign the jar files so they can get full rights in a browser
 task signLibs(type: IncrementalSigningTask, dependsOn: [copyLibs]) {
@@ -220,9 +217,5 @@ task distApplet(dependsOn: [signLibs, createIndexHtml, copyExtras]) {
 task distAppletZip(type:Zip) {
     description = "Creates an Applet ZIP file from '$buildDir/$destDirApplet'"
     dependsOn distApplet
-    //dependsOn createVersionInfoFile
-    //dependsOn createVersionFile
-    //appendix 'Applet'
     from "$buildDir/$destDirApplet"
-    //from "$buildDir/$versionFileName"
 }
