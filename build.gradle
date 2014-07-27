@@ -221,3 +221,13 @@ task distAppletZip(type:Zip) {
     archiveName = "applet.zip"
     from "$buildDir/$destDirApplet"
 }
+
+// Prep an IntelliJ module for the facade
+idea {
+    module {
+        // Change around the output a bit
+        inheritOutputDirs = false
+        outputDir = file('build/classes')
+        testOutputDir = file('build/testClasses')
+    }
+}
