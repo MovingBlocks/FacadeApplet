@@ -141,10 +141,10 @@ public final class TerasologyApplet extends Applet {
                 try {
                     Collection<EngineSubsystem> subsystemList;
                     subsystemList = Lists.<EngineSubsystem>newArrayList(new LwjglGraphics(), new LwjglTimer(), new LwjglAudio(), new LwjglInput());
-                    TerasologyEngine engine = new TerasologyEngine(subsystemList);
+                    engine = new TerasologyEngine(subsystemList);
                     engine.init();
                     engine.run(new StateMainMenu());
-                    engine.dispose();
+                    engine.close();
                 } catch (Exception e) {
                     logger.error(e.toString(), e);
                 }
