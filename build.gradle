@@ -5,7 +5,7 @@ apply from: "$rootDir/config/gradle/common.gradle"
 
 import org.apache.tools.ant.filters.FixCrLfFilter;
 
-def LWJGL_VERSION = '2.9.1'
+def LWJGL_VERSION = '2.9.2'
 def JINPUT_VERSION = '2.0.5'
 
 // Declare "extra properties" (variables) for the project - a Gradle thing that makes them special.
@@ -96,22 +96,6 @@ task copyLibs(type:Copy, dependsOn: addModules) {
     into(subDirModules) {
         from configurations.modules
     }
-    
-    // TODO: Remove this part as soon as LWJGL applet jars work correctly
-    // see https://github.com/LWJGL/lwjgl/pull/73
-    // Overwrite invalid AppLibAC attribute ("true") in LWJGL 2.9.1 jars
-    def lwjglFiles = fileTree(dir: "$dirUnsigned/$subDirLibs", include: 'lwjgl_util*.jar')
-    
-    doLast {
-        lwjglFiles.each {
-            logger.lifecycle("Fixing manifest in invalid LWJGL file $it");
-            ant.jar(destfile: it, update: true) {
-                delegate.manifest {
-                    attribute(name: 'Application-Library-Allowable-Codebase', value: '*')
-                }
-            }
-        }
-    }    
 }
 
 task createIndexHtml(type:Copy) {
