@@ -164,14 +164,20 @@ class IncrementalSigningTask extends DefaultTask {
                     def target = change.relativePath.getFile(outputDir)
                     logger.debug("Signing file $change.file")
                     logger.debug("Storing signed file $target")
-                    ant.signjar(
-                        jar: change.file,
-                        signedjar: target,
-                        keystore: certFile,
-                        alias: certAlias,
-                        storepass: certStorePass,
-                        keypass: certKeyPass,
-                        tsaurl: 'http://time.certum.pl/')
+
+                     if (project.hasProperty("certificateFile")) {
+                         ant.signjar(
+                                 jar: change.file,
+                                 signedjar: target,
+                                 keystore: certFile,
+                                 alias: certAlias,
+                                 storepass: certStorePass,
+                                 keypass: certKeyPass,
+                                 tsaurl: 'http://time.certum.pl/')
+                     } else {
+                         // If the certificate setup is not present just copy the files to emulate this step
+                         ant.copy(file: change.file, tofile: target)
+                     }
                 } catch (Exception e) {
                     logger.warn("Error signing", e)
                 }
@@ -188,10 +194,18 @@ task signLibs(type: IncrementalSigningTask, dependsOn: [copyLibs]) {
     inputTree = fileTree(dirUnsigned)
     outputDir = file("$buildDir/$destDirApplet")
 
-    certFile = certificateFile
-    certAlias = certificateAlias
-    certStorePass = certificateStorePass
-    certKeyPass = certificateKeyPass
+    if (project.hasProperty("certificateFile")) {
+        certFile = certificateFile
+        certAlias = certificateAlias
+        certStorePass = certificateStorePass
+        certKeyPass = certificateKeyPass
+    } else {
+        logger.warn("Certificate file property not present (debug session?) - NOT signing jars")
+        certFile = "INVALID"
+        certAlias = "INVALID"
+        certStorePass = "INVALID"
+        certKeyPass = "INVALID"
+    }
 }
 
 
