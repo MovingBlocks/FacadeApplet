@@ -6,6 +6,7 @@ apply from: "$rootDir/config/gradle/common.gradle"
 import org.apache.tools.ant.filters.FixCrLfFilter;
 
 def LWJGL_VERSION = '2.9.2'
+def LWJGL_VERSION_APPLET = '2.9.1'
 def JINPUT_VERSION = '2.0.5'
 
 // Declare "extra properties" (variables) for the project - a Gradle thing that makes them special.
@@ -30,7 +31,7 @@ configurations {
 }
 
 dependencies {
-    compile (group: 'org.lwjgl.lwjgl', name: 'lwjgl_util_applet', version: LWJGL_VERSION)
+    compile (group: 'org.lwjgl.lwjgl', name: 'lwjgl_util_applet', version: LWJGL_VERSION_APPLET)
     compile (group: 'org.terasology.engine', name: 'engine', version: '+')
     modules (group: 'org.terasology.modules', name: 'Core', version: '+')
 }
@@ -119,7 +120,11 @@ task createIndexHtml(type:Copy) {
     
     from('index.html')
     into("$buildDir/$destDirApplet")
-    expand(lwjglVersion: LWJGL_VERSION, jinputVersion : JINPUT_VERSION, jars : jars.join(", "), modules : modules.join(", "))
+    expand(lwjglVersion: LWJGL_VERSION,
+            lwjglVersionApplet: LWJGL_VERSION_APPLET,
+            jinputVersion : JINPUT_VERSION,
+            jars : jars.join(", "),
+            modules : modules.join(", "))
 }
 
 // TODO: Maybe split this out as a tiny plugin or something sometime?
