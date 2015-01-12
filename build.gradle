@@ -97,6 +97,23 @@ task copyLibs(type:Copy, dependsOn: addModules) {
     into(subDirModules) {
         from configurations.modules
     }
+
+    // UPDATE after bug below fixed: the applet failed with 2.9.2 :-( Attempted partial rollback, but then we need the hack again ...
+    // TODO: Remove this part as soon as LWJGL applet jars work correctly
+    // see https://github.com/LWJGL/lwjgl/pull/73
+    // Overwrite invalid AppLibAC attribute ("true") in LWJGL 2.9.1 jars
+    def lwjglFiles = fileTree(dir: "$dirUnsigned/$subDirLibs", include: 'lwjgl_util_applet*.jar')
+
+    doLast {
+        lwjglFiles.each {
+            logger.lifecycle("Fixing manifest in invalid LWJGL file $it");
+            ant.jar(destfile: it, update: true) {
+                delegate.manifest {
+                    attribute(name: 'Application-Library-Allowable-Codebase', value: '*')
+                }
+            }
+        }
+    }
 }
 
 task createIndexHtml(type:Copy) {
@@ -165,31 +182,31 @@ class IncrementalSigningTask extends DefaultTask {
             if (change.directory) {
                 change.relativePath.getFile(outputDir).mkdirs() 
             } else if (ood.contains(change.file)) {
-                 try {
+                try {
                     def target = change.relativePath.getFile(outputDir)
-                    logger.debug("Signing file $change.file")
-                    logger.debug("Storing signed file $target")
-
-                     if (project.hasProperty("certificateFile")) {
-                         ant.signjar(
-                                 jar: change.file,
-                                 signedjar: target,
-                                 keystore: certFile,
-                                 alias: certAlias,
-                                 storepass: certStorePass,
-                                 keypass: certKeyPass,
-                                 tsaurl: 'http://time.certum.pl/')
-                     } else {
-                         // If the certificate setup is not present just copy the files to emulate this step
-                         ant.copy(file: change.file, tofile: target)
-                     }
+                    if (project.hasProperty("certificateFile")) {
+                        logger.debug("Signing file $change.file")
+                        logger.debug("Storing signed file $target")
+                        ant.signjar(
+                                jar: change.file,
+                                signedjar: target,
+                                keystore: certFile,
+                                alias: certAlias,
+                                storepass: certStorePass,
+                                keypass: certKeyPass,
+                                tsaurl: 'http://time.certum.pl/')
+                    } else {
+                        // If the certificate setup is not present just copy the files to emulate this step
+                        logger.debug("Bypassing signing, just copying $target")
+                        ant.copy(file: change.file, tofile: target)
+                    }
                 } catch (Exception e) {
                     logger.warn("Error signing", e)
                 }
             }
-            logger.lifecycle("Signed $change.relativePath");
+            logger.lifecycle("Processed for applet: $change.relativePath");
         }
-        logger.lifecycle("Signing complete")
+        logger.lifecycle("Signing process complete (enabled or not)")
     }
 }
 
