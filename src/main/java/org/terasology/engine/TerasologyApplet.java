@@ -1,5 +1,5 @@
 /*
- * Copyright 2013 MovingBlocks
+ * Copyright 2015 MovingBlocks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -48,8 +48,7 @@ import ch.qos.logback.core.AppenderBase;
 import com.google.common.collect.Lists;
 
 /**
- * @author Benjamin Glatzel <benjamin.glatzel@me.com>
- * @author Rasmus 'Cervator' Praestholm <cervator@gmail.com>
+ * Main class for launching Terasology as an applet.
  */
 public final class TerasologyApplet extends Applet {
 
