@@ -34,6 +34,7 @@ dependencies {
     compile (group: 'org.lwjgl.lwjgl', name: 'lwjgl_util_applet', version: LWJGL_VERSION_APPLET)
     compile (group: 'org.terasology.engine', name: 'engine', version: '+')
     modules (group: 'org.terasology.modules', name: 'Core', version: '+')
+    modules (group: 'org.terasology.modules', name: 'CoreSampleGameplay', version: '+')
 }
 
 jar {
@@ -93,7 +94,7 @@ task copyLibs(type:Copy, dependsOn: addModules) {
         from configurations.runtime
     }
 
-    // Modules (just Core unless extraModules is passed in)
+    // Modules (just Core + CoreSampleGameplay unless extraModules is passed in)
     into(subDirModules) {
         from configurations.modules
     }
