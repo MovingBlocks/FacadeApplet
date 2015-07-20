@@ -26,7 +26,6 @@ import java.nio.channels.ReadableByteChannel;
 import java.nio.channels.SeekableByteChannel;
 import java.nio.file.Files;
 import java.nio.file.StandardOpenOption;
-import java.util.Collection;
 
 import javax.swing.JScrollPane;
 import javax.swing.JTextArea;
@@ -44,8 +43,6 @@ import org.terasology.engine.subsystem.lwjgl.LwjglTimer;
 import ch.qos.logback.classic.LoggerContext;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.AppenderBase;
-
-import com.google.common.collect.Lists;
 
 /**
  * Main class for launching Terasology as an applet.
@@ -138,9 +135,13 @@ public final class TerasologyApplet extends Applet {
             @Override
             public void run() {
                 try {
-                    Collection<EngineSubsystem> subsystemList;
-                    subsystemList = Lists.<EngineSubsystem>newArrayList(new LwjglGraphics(), new LwjglTimer(), new LwjglAudio(), new LwjglInput());
-                    engine = new TerasologyEngine(subsystemList);
+                    TerasologyEngineBuilder builder = new TerasologyEngineBuilder();
+                    EngineSubsystem audio = new LwjglAudio();
+                    builder.add(audio)
+                            .add(new LwjglGraphics())
+                            .add(new LwjglTimer())
+                            .add(new LwjglInput());
+                    engine = builder.build();
                     engine.run(new StateMainMenu());
                 } catch (Exception e) {
                     logger.error(e.toString(), e);
