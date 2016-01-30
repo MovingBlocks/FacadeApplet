@@ -5,7 +5,7 @@ apply from: "$rootDir/config/gradle/common.gradle"
 
 import org.apache.tools.ant.filters.FixCrLfFilter;
 
-def LWJGL_VERSION = '2.9.2'
+def LWJGL_VERSION = '2.9.3'
 def LWJGL_VERSION_APPLET = '2.9.1'
 def JINPUT_VERSION = '2.0.5'
 
